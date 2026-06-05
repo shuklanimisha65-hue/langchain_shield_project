@@ -6,10 +6,6 @@ import cv2
 import tempfile  
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage
@@ -21,18 +17,11 @@ st.title("🎃 Deepfake Shield Web Interface")
 
 @st.cache_resource
 def initialize_shield_engine():
-    """Loads environment variables, initializes models, and sets up the database once."""
+    """Loads environment variables, initializes models, and sets up the standalone engine."""
     load_dotenv()
     set_llm_cache(InMemoryCache())
     
     llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-    embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    vector_store = InMemoryVectorStore(embedding_model)
-
-    loader = TextLoader("shield.txt")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = text_splitter.split_documents(loader.load())
-    vector_store.add_documents(chunks)
 
     rag_prompt = ChatPromptTemplate.from_messages([
        ("system", (
@@ -44,9 +33,10 @@ def initialize_shield_engine():
     ])
 
     rag_chain = rag_prompt | llm | StrOutputParser()
-    return vector_store, rag_chain
+    return rag_chain
 
-vector_store, rag_chain = initialize_shield_engine()
+# Only returning the execution chain now
+rag_chain = initialize_shield_engine()
 
 @st.cache_data(ttl=3600)
 def check_global_news(keyword):
@@ -74,7 +64,6 @@ def extract_video_frames_to_base64(uploaded_file, num_frames=3):
     """Saves video bytes to a temp file, samples frames evenly, and returns Base64 strings."""
     base64_frames = []
     
-    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_file:
         temp_file.write(uploaded_file.read())
         temp_path = temp_file.name
@@ -83,14 +72,12 @@ def extract_video_frames_to_base64(uploaded_file, num_frames=3):
     total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
     
     if total_frames > 0:
-       
         frame_indices = [int(total_frames * i / (num_frames + 1)) for i in range(1, num_frames + 1)]
         
         for idx in frame_indices:
             video_capture.set(cv2.CAP_PROP_POS_FRAMES, idx)
             success, frame = video_capture.read()
             if success:
-               
                 _, encoded_buffer = cv2.imencode('.jpg', frame)
                 base64_str = base64.b64encode(encoded_buffer).decode('utf-8')
                 base64_frames.append(base64_str)
@@ -181,7 +168,6 @@ if run_rag:
                     st.info("👁️ Static image detected. Analyzing raw pixel patches...")
                     base64_image = process_image_to_base64(uploaded_file)
                     content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}})
-                
                 
                 multimodal_message = HumanMessage(content=content_payload)
                 st.write_stream(vision_llm.stream([multimodal_message]))
