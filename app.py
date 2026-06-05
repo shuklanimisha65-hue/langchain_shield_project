@@ -1,5 +1,9 @@
 import streamlit as st
 import os
+
+os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+os.environ["NEWS_API_KEY"] = st.secrets["NEWS_API_KEY"]
+
 import requests
 import base64
 import cv2  
