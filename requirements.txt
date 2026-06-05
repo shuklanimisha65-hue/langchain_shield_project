@@ -7,3 +7,5 @@ langchain-community
 langchain-core
 langchain-text-splitters
 python-dotenv
+sentence-transformers
+faiss-cpu
